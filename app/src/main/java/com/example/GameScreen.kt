@@ -61,15 +61,22 @@ fun GameScreen() {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     
-    val sceneManager = remember { SceneManager(context, engine) }
+    val sceneManager = remember(engine) { SceneManager(context, engine) }
     
     val playerModelInstance = remember { mutableStateOf<ModelInstance?>(null) }
+    var isLoadingModel by remember { mutableStateOf(true) }
 
     // Update scene manager when model is loaded
     LaunchedEffect(modelLoader) {
-        playerModelInstance.value = modelLoader.createModelInstance(
-            assetFileLocation = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
-        )
+        try {
+            playerModelInstance.value = modelLoader.createModelInstance(
+                assetFileLocation = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
+            )
+        } catch (e: Exception) {
+            // Handle loading error
+        } finally {
+            isLoadingModel = false
+        }
     }
     
     LaunchedEffect(playerModelInstance.value) {
@@ -215,6 +222,21 @@ fun GameScreen() {
                     playerPosZ = playerState.positionZ,
                     onClose = { isMapVisible = false }
                 )
+            }
+        }
+
+        if (isLoadingModel) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading Wilderness...", color = Color.White)
+                }
             }
         }
     }
