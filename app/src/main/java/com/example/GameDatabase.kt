@@ -31,7 +31,7 @@ interface SaveDao {
     suspend fun insertSaveData(saveData: SaveData)
 }
 
-@Database(entities = [SaveData::class], version = 1)
+@Database(entities = [SaveData::class], version = 1, exportSchema = false)
 abstract class GameDatabase : RoomDatabase() {
     abstract fun saveDao(): SaveDao
 }

@@ -11,12 +11,20 @@ import io.github.sceneview.math.Size
 
 class SceneManager(private val context: Context, private val modelLoader: ModelLoader) {
     
-    val playerNode = ModelNode(
-        modelInstance = modelLoader.createModelInstance(
+    var playerNode: ModelNode? = null
+        private set
+
+    init {
+        val modelInstance = modelLoader.createModelInstance(
             assetFileLocation = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
-        )!!,
-        scaleToUnits = 1.0f
-    )
+        )
+        if (modelInstance != null) {
+            playerNode = ModelNode(
+                modelInstance = modelInstance,
+                scaleToUnits = 1.0f
+            )
+        }
+    }
     
     val groundNode = CubeNode(
         engine = modelLoader.engine,
@@ -26,6 +34,8 @@ class SceneManager(private val context: Context, private val modelLoader: ModelL
     }
     
     fun updatePlayer(state: PlayerState, cameraRotX: Float, cameraRotY: Float) {
+        val node = playerNode ?: return
+        
         // Animation: simple bobbing when walking/running
         val time = System.currentTimeMillis() / 1000f
         val bob = if (state.movementState != MovementState.IDLE) {
@@ -33,8 +43,8 @@ class SceneManager(private val context: Context, private val modelLoader: ModelL
             kotlin.math.sin(time * freq) * 0.05f
         } else 0f
         
-        playerNode.position = Position(state.positionX, state.positionY + bob, state.positionZ)
-        playerNode.rotation = Rotation(0f, state.rotationY, 0f)
+        node.position = Position(state.positionX, state.positionY + bob, state.positionZ)
+        node.rotation = Rotation(0f, state.rotationY, 0f)
     }
     
     private fun sin(rad: Float) = kotlin.math.sin(rad.toDouble()).toFloat()

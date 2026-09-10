@@ -36,7 +36,7 @@ fun GameScreen() {
             context,
             GameDatabase::class.java,
             "game_db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
     
     val viewModel: GameViewModel = viewModel(
@@ -78,7 +78,7 @@ fun GameScreen() {
         val camZ = playerState.positionZ + cos(radY) * cos(radX) * cameraDistance
         
         cameraNode.position = Position(camX, camY, camZ)
-        cameraNode.lookAt(sceneManager.playerNode.position)
+        cameraNode.lookAt(sceneManager.playerNode?.position ?: Position(playerState.positionX, playerState.positionY, playerState.positionZ))
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -88,7 +88,7 @@ fun GameScreen() {
             engine = engine,
             modelLoader = modelLoader,
             cameraNode = cameraNode,
-            childNodes = listOf(sceneManager.playerNode, sceneManager.groundNode, mainLightNode)
+            childNodes = listOfNotNull(sceneManager.playerNode, sceneManager.groundNode, mainLightNode)
         )
 
         // Overlay UI
