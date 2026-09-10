@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.Context
+import androidx.compose.runtime.*
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.node.Node
 import io.github.sceneview.math.Position
@@ -14,7 +15,7 @@ import kotlin.math.cos
 
 class SceneManager(private val context: Context, private val engine: Engine) {
     
-    var playerNode: ModelNode? = null
+    var playerNode by mutableStateOf<ModelNode?>(null)
         private set
 
     private var currentAnimationIndex = -1
@@ -22,12 +23,13 @@ class SceneManager(private val context: Context, private val engine: Engine) {
 
     fun setPlayerModel(modelInstance: io.github.sceneview.model.ModelInstance) {
         try {
-            playerNode = ModelNode(
+            val newNode = ModelNode(
                 modelInstance = modelInstance,
                 scaleToUnits = 1.0f
             ).apply {
                 position = Position(0f, 0f, 0f)
             }
+            playerNode = newNode
         } catch (e: Exception) {
             // Handle error
         }
