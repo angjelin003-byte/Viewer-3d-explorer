@@ -27,8 +27,9 @@ fun Joystick(
     size: Float = 150f,
     onMove: (x: Float, y: Float) -> Unit
 ) {
+    val density = LocalDensity.current
+    val radiusPx = with(density) { (size / 2).dp.toPx() }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val radius = size / 2
 
     Box(
         modifier = modifier
@@ -44,13 +45,15 @@ fun Joystick(
                     onDrag = { change, dragAmount ->
                         val newOffset = offset + dragAmount
                         val distance = sqrt(newOffset.x.pow(2) + newOffset.y.pow(2))
-                        offset = if (distance <= radius * 2) { // Allow some overflow for better feel
+                        
+                        offset = if (distance <= radiusPx) {
                             newOffset
                         } else {
                             val angle = atan2(newOffset.y, newOffset.x)
-                            Offset(cos(angle) * radius * 2, sin(angle) * radius * 2)
+                            Offset(cos(angle) * radiusPx, sin(angle) * radiusPx)
                         }
-                        onMove(offset.x / radius, -offset.y / radius)
+                        
+                        onMove(offset.x / radiusPx, -offset.y / radiusPx)
                         change.consume()
                     }
                 )

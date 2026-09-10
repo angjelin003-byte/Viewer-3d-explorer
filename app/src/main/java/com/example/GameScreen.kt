@@ -15,8 +15,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.sceneview.SceneView
 import kotlinx.coroutines.delay
+import kotlin.math.sin
+import kotlin.math.cos
+
+import io.github.sceneview.Scene
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberCameraNode
+import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberNodes
+import io.github.sceneview.math.Position
+import io.github.sceneview.rememberMainLightNode
 
 @Composable
 fun GameScreen() {
@@ -41,21 +51,61 @@ fun GameScreen() {
     val gameTime by viewModel.gameTime.collectAsState()
     var isMapVisible by remember { mutableStateOf(false) }
     
-    val sceneManager = remember { SceneManager(context) }
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
+    
+    val sceneManager = remember { SceneManager(context, modelLoader) }
+    
+    val cameraNode = rememberCameraNode(engine).apply {
+        position = Position(0f, 1.5f, 4f)
+    }
+
+    val mainLightNode = rememberMainLightNode(engine) {
+        intensity = 100_000f
+    }
+
+    LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY) {
+        sceneManager.updatePlayer(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY)
+        
+        // Update camera position to follow player (Third Person)
+        val cameraDistance = 4f
+        val radY = Math.toRadians(viewModel.cameraRotationY.toDouble()).toFloat()
+        val radX = Math.toRadians(viewModel.cameraRotationX.toDouble()).toFloat()
+        
+        val camX = playerState.positionX + sin(radY) * cos(radX) * cameraDistance
+        val camY = playerState.positionY - sin(radX) * cameraDistance + 1.5f // Height offset
+        val camZ = playerState.positionZ + cos(radY) * cos(radX) * cameraDistance
+        
+        cameraNode.position = Position(camX, camY, camZ)
+        cameraNode.lookAt(sceneManager.playerNode.position)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // 3D Scene
-        AndroidView(
+        Scene(
             modifier = Modifier.fillMaxSize(),
-            factory = { sceneManager.sceneView },
-            update = { 
-                sceneManager.updatePlayer(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY)
-                sceneManager.updateTime(gameTime.hour)
-            }
+            engine = engine,
+            modelLoader = modelLoader,
+            cameraNode = cameraNode,
+            childNodes = listOf(sceneManager.playerNode, sceneManager.groundNode, mainLightNode)
         )
 
         // Overlay UI
         Box(modifier = Modifier.fillMaxSize()) {
+            // Interaction Area for Camera Control (Background of UI)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            viewModel.cameraRotationY -= dragAmount.x * 0.5f
+                            viewModel.cameraRotationX = (viewModel.cameraRotationX - dragAmount.y * 0.5f).coerceIn(-60f, 20f)
+                            change.consume()
+                        }
+                    }
+            )
+
             // Top HUD
             Row(
                 modifier = Modifier
@@ -136,20 +186,6 @@ fun GameScreen() {
                     )
                 }
             }
-            
-            // Interaction Area for Camera Control (Right side of screen)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Transparent)
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            viewModel.cameraRotationY -= dragAmount.x * 0.5f
-                            viewModel.cameraRotationX = (viewModel.cameraRotationX - dragAmount.y * 0.5f).coerceIn(-60f, 20f)
-                            change.consume()
-                        }
-                    }
-            )
             
             if (isMapVisible) {
                 MapOverlay(
