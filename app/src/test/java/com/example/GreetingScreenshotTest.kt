@@ -23,7 +23,7 @@ class GreetingScreenshotTest {
   fun compass_screenshot() {
     composeTestRule.setContent { 
       IslandExplorerTheme { 
-        Compass(rotationY = 45f) 
+        CompassHUD(rotationY = 45f) 
       } 
     }
 
