@@ -1,0 +1,6 @@
+{
+  "name": "Island Explorer",
+  "description": "A realistic 3D wilderness exploration simulator set on a vast 1km island.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

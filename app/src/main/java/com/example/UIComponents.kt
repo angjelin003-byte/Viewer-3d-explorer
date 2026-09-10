@@ -1,0 +1,144 @@
+package com.example
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import kotlin.math.*
+
+@Composable
+fun Joystick(
+    modifier: Modifier = Modifier,
+    size: Float = 150f,
+    onMove: (x: Float, y: Float) -> Unit
+) {
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val radius = size / 2
+
+    Box(
+        modifier = modifier
+            .size(size.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.3f))
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        offset = Offset.Zero
+                        onMove(0f, 0f)
+                    },
+                    onDrag = { change, dragAmount ->
+                        val newOffset = offset + dragAmount
+                        val distance = sqrt(newOffset.x.pow(2) + newOffset.y.pow(2))
+                        offset = if (distance <= radius * 2) { // Allow some overflow for better feel
+                            newOffset
+                        } else {
+                            val angle = atan2(newOffset.y, newOffset.x)
+                            Offset(cos(angle) * radius * 2, sin(angle) * radius * 2)
+                        }
+                        onMove(offset.x / radius, -offset.y / radius)
+                        change.consume()
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
+                .size((size / 2.5).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.7f))
+        )
+    }
+}
+
+@Composable
+fun ActionButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    active: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(64.dp)
+            .clip(CircleShape)
+            .background(if (active) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.4f))
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (active) MaterialTheme.colorScheme.onPrimary else Color.White
+        )
+    }
+}
+
+@Composable
+fun StaminaBar(stamina: Float, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.width(200.dp)) {
+        LinearProgressIndicator(
+            progress = { stamina / 100f },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(CircleShape),
+            color = if (stamina < 20f) Color.Red else Color.Green,
+            trackColor = Color.Gray.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+fun Compass(rotationY: Float, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(80.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.4f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = size / 2f
+            val radius = size.minDimension / 2f * 0.8f
+            
+            // Draw N, S, E, W
+            val directions = listOf("N", "E", "S", "W")
+            directions.forEachIndexed { index, label ->
+                val angle = Math.toRadians((index * 90 - rotationY - 90).toDouble()).toFloat()
+                val x = center.width + cos(angle) * radius
+                val y = center.height + sin(angle) * radius
+                // Simplified text drawing - just dots for now
+                drawCircle(Color.White, radius = 4f, center = Offset(x, y))
+            }
+            
+            // Needle
+            val needleAngle = Math.toRadians((-rotationY - 90).toDouble()).toFloat()
+            drawLine(
+                color = Color.Red,
+                start = Offset(center.width, center.height),
+                end = Offset(
+                    center.width + cos(needleAngle) * radius,
+                    center.height + sin(needleAngle) * radius
+                ),
+                strokeWidth = 4f
+            )
+        }
+        Text("N", color = Color.Red, style = MaterialTheme.typography.labelSmall)
+    }
+}
