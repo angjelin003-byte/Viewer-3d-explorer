@@ -28,21 +28,27 @@ import io.github.sceneview.rememberNodes
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberMainLightNode
 
+import io.github.sceneview.model.ModelInstance
+
 @Composable
 fun GameScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val database = remember { 
-        androidx.room.Room.databaseBuilder(
-            context,
-            GameDatabase::class.java,
-            "game_db"
-        ).fallbackToDestructiveMigration().build()
+        try {
+            androidx.room.Room.databaseBuilder(
+                context,
+                GameDatabase::class.java,
+                "game_db"
+            ).fallbackToDestructiveMigration().build()
+        } catch (e: Exception) {
+            null
+        }
     }
     
     val viewModel: GameViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                return GameViewModel(database.saveDao()) as T
+                return GameViewModel(database?.saveDao()) as T
             }
         }
     )
@@ -55,7 +61,22 @@ fun GameScreen() {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     
-    val sceneManager = remember { SceneManager(context, modelLoader) }
+    val sceneManager = remember { SceneManager(context, engine) }
+    
+    val playerModelInstance = remember { mutableStateOf<ModelInstance?>(null) }
+
+    // Update scene manager when model is loaded
+    LaunchedEffect(modelLoader) {
+        playerModelInstance.value = modelLoader.createModelInstance(
+            assetFileLocation = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
+        )
+    }
+    
+    LaunchedEffect(playerModelInstance.value) {
+        playerModelInstance.value?.let {
+            sceneManager.setPlayerModel(it)
+        }
+    }
     
     val cameraNode = rememberCameraNode(engine).apply {
         position = Position(0f, 1.5f, 4f)
@@ -65,7 +86,8 @@ fun GameScreen() {
         intensity = 100_000f
     }
 
-    LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY) {
+    LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY, sceneManager.playerNode) {
+        val node = sceneManager.playerNode ?: return@LaunchedEffect
         sceneManager.updatePlayer(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY)
         
         // Update camera position to follow player (Third Person)
@@ -78,7 +100,7 @@ fun GameScreen() {
         val camZ = playerState.positionZ + cos(radY) * cos(radX) * cameraDistance
         
         cameraNode.position = Position(camX, camY, camZ)
-        cameraNode.lookAt(sceneManager.playerNode?.position ?: Position(playerState.positionX, playerState.positionY, playerState.positionZ))
+        cameraNode.lookAt(node.position)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

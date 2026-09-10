@@ -47,36 +47,44 @@ class GameViewModel(private val saveDao: SaveDao? = null) : ViewModel() {
 
     private fun loadGame() {
         viewModelScope.launch {
-            saveDao?.getSaveData()?.let { data ->
-                _playerState.value = PlayerState(
-                    positionX = data.posX,
-                    positionY = data.posY,
-                    positionZ = data.posZ,
-                    rotationY = data.rotY,
-                    stamina = data.stamina,
-                    isTentDeployed = data.isTentDeployed
-                )
-                _gameTime.value = GameTime(hour = data.hour, minute = data.minute)
+            try {
+                saveDao?.getSaveData()?.let { data ->
+                    _playerState.value = PlayerState(
+                        positionX = data.posX,
+                        positionY = data.posY,
+                        positionZ = data.posZ,
+                        rotationY = data.rotY,
+                        stamina = data.stamina,
+                        isTentDeployed = data.isTentDeployed
+                    )
+                    _gameTime.value = GameTime(hour = data.hour, minute = data.minute)
+                }
+            } catch (e: Exception) {
+                // Ignore load errors
             }
         }
     }
 
     fun saveGame() {
         viewModelScope.launch {
-            val p = _playerState.value
-            val t = _gameTime.value
-            saveDao?.insertSaveData(
-                SaveData(
-                    posX = p.positionX,
-                    posY = p.positionY,
-                    posZ = p.positionZ,
-                    rotY = p.rotationY,
-                    hour = t.hour,
-                    minute = t.minute,
-                    stamina = p.stamina,
-                    isTentDeployed = p.isTentDeployed
+            try {
+                val p = _playerState.value
+                val t = _gameTime.value
+                saveDao?.insertSaveData(
+                    SaveData(
+                        posX = p.positionX,
+                        posY = p.positionY,
+                        posZ = p.positionZ,
+                        rotY = p.rotationY,
+                        hour = t.hour,
+                        minute = t.minute,
+                        stamina = p.stamina,
+                        isTentDeployed = p.isTentDeployed
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                // Ignore save errors
+            }
         }
     }
 
