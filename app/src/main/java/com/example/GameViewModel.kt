@@ -31,7 +31,7 @@ data class GameTime(
     val minute: Int = 0
 )
 
-class GameViewModel : ViewModel() {
+class GameViewModel(private val saveDao: SaveDao? = null) : ViewModel() {
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState = _playerState.asStateFlow()
 
@@ -40,6 +40,45 @@ class GameViewModel : ViewModel() {
 
     var cameraRotationY by mutableStateOf(0f)
     var cameraRotationX by mutableStateOf(-20f) // Initial tilt down
+
+    init {
+        loadGame()
+    }
+
+    private fun loadGame() {
+        viewModelScope.launch {
+            saveDao?.getSaveData()?.let { data ->
+                _playerState.value = PlayerState(
+                    positionX = data.posX,
+                    positionY = data.posY,
+                    positionZ = data.posZ,
+                    rotationY = data.rotY,
+                    stamina = data.stamina,
+                    isTentDeployed = data.isTentDeployed
+                )
+                _gameTime.value = GameTime(hour = data.hour, minute = data.minute)
+            }
+        }
+    }
+
+    fun saveGame() {
+        viewModelScope.launch {
+            val p = _playerState.value
+            val t = _gameTime.value
+            saveDao?.insertSaveData(
+                SaveData(
+                    posX = p.positionX,
+                    posY = p.positionY,
+                    posZ = p.positionZ,
+                    rotY = p.rotationY,
+                    hour = t.hour,
+                    minute = t.minute,
+                    stamina = p.stamina,
+                    isTentDeployed = p.isTentDeployed
+                )
+            )
+        }
+    }
 
     fun updatePosition(dx: Float, dz: Float, rotation: Float) {
         val currentState = _playerState.value

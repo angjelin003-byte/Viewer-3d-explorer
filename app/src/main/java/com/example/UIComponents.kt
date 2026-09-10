@@ -142,3 +142,55 @@ fun Compass(rotationY: Float, modifier: Modifier = Modifier) {
         Text("N", color = Color.Red, style = MaterialTheme.typography.labelSmall)
     }
 }
+
+@Composable
+fun MapOverlay(
+    playerPosX: Float,
+    playerPosZ: Float,
+    onClose: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f))
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "Island Map (1km x 1km)",
+                color = Color.White,
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Box(
+                modifier = Modifier
+                    .size(300.dp)
+                    .background(Color(0xFF2D5A27)) // Dark green for island
+            ) {
+                // Map visualization
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val mapSize = 1000f // 1km
+                    val centerX = size.width / 2
+                    val centerY = size.height / 2
+                    
+                    // Player marker (normalized to map size)
+                    val px = centerX + (playerPosX / mapSize) * size.width
+                    val py = centerY + (playerPosZ / mapSize) * size.height
+                    
+                    drawCircle(
+                        color = Color.Red,
+                        radius = 8f,
+                        center = Offset(px, py)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(onClick = onClose) {
+                Text("Close Map")
+            }
+        }
+    }
+}

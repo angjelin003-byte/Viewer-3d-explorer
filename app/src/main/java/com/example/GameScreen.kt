@@ -19,11 +19,28 @@ import io.github.sceneview.SceneView
 import kotlinx.coroutines.delay
 
 @Composable
-fun GameScreen(viewModel: GameViewModel = viewModel()) {
+fun GameScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val database = remember { 
+        androidx.room.Room.databaseBuilder(
+            context,
+            GameDatabase::class.java,
+            "game_db"
+        ).build()
+    }
+    
+    val viewModel: GameViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return GameViewModel(database.saveDao()) as T
+            }
+        }
+    )
+
     val playerState by viewModel.playerState.collectAsState()
     val gameTime by viewModel.gameTime.collectAsState()
+    var isMapVisible by remember { mutableStateOf(false) }
     
-    val context = androidx.compose.ui.platform.LocalContext.current
     val sceneManager = remember { SceneManager(context) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -109,6 +126,11 @@ fun GameScreen(viewModel: GameViewModel = viewModel()) {
                     )
                     
                     ActionButton(
+                        icon = Icons.Default.Map,
+                        onClick = { isMapVisible = true }
+                    )
+                    
+                    ActionButton(
                         icon = Icons.Default.Backpack,
                         onClick = { /* Open Backpack */ }
                     )
@@ -128,14 +150,22 @@ fun GameScreen(viewModel: GameViewModel = viewModel()) {
                         }
                     }
             )
+            
+            if (isMapVisible) {
+                MapOverlay(
+                    playerPosX = playerState.positionX,
+                    playerPosZ = playerState.positionZ,
+                    onClose = { isMapVisible = false }
+                )
+            }
         }
     }
     
     // Auto-save or periodic updates
     LaunchedEffect(Unit) {
         while (true) {
-            delay(1000)
-            // viewModel.tick()
+            delay(10000) // Save every 10 seconds
+            viewModel.saveGame()
         }
     }
 }

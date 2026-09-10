@@ -19,16 +19,23 @@ class SceneManager(private val context: Context) {
     private val playerNode = Node(engine = sceneView.engine)
     
     private val torchLight = Node(engine = sceneView.engine)
+    private val ground = Node(engine = sceneView.engine)
     
     init {
         playerNode.position = Position(x = 0f, y = 0f, z = 0f)
         sceneView.addChild(playerNode)
         
-        // Setup fog for atmosphere
-        // sceneView.fog = Fog(...)
+        // Simple ground representation
+        ground.position = Position(0f, -0.1f, 0f)
+        // In a real app, we would add a renderable to ground
+        sceneView.addChild(ground)
     }
     
     fun updatePlayer(state: PlayerState, cameraRotX: Float, cameraRotY: Float) {
+        // Torch logic
+        torchLight.position = playerNode.position
+        // torchLight.isVisible = state.isTorchOn
+        
         // Animation: simple bobbing when walking/running
         val time = System.currentTimeMillis() / 1000f
         val bob = if (state.movementState != MovementState.IDLE) {
