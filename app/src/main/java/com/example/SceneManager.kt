@@ -36,7 +36,9 @@ class SceneManager(private val context: Context, private val engine: Engine) {
             playerNode = ModelNode(
                 modelInstance = modelInstance,
                 scaleToUnits = 1.0f
-            )
+            ).apply {
+                position = Position(0f, 0f, 0f)
+            }
         } catch (e: Exception) {
             // Handle error
         }

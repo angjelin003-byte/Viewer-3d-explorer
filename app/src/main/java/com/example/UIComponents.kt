@@ -197,3 +197,69 @@ fun MapOverlay(
         }
     }
 }
+
+@Composable
+fun BackpackOverlay(onClose: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f))
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.8f),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Inventory", style = MaterialTheme.typography.headlineMedium)
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+                
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                
+                // Simplified Inventory Grid
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(12) { index ->
+                        Box(
+                            modifier = Modifier
+                                .aspectRatio(1f)
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val icon = when(index) {
+                                0 -> Icons.Default.FlashlightOn
+                                1 -> Icons.Default.Home
+                                2 -> Icons.Default.Restaurant
+                                else -> Icons.Default.Inventory2
+                            }
+                            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    "Backpack items collected on the island appear here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}

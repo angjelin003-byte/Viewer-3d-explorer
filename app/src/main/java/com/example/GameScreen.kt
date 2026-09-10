@@ -23,6 +23,8 @@ import io.github.sceneview.Scene
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberCameraNode
+import io.github.sceneview.environment.Environment
+import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberNodes
 import io.github.sceneview.math.Position
@@ -56,11 +58,23 @@ fun GameScreen() {
     val playerState by viewModel.playerState.collectAsState()
     val gameTime by viewModel.gameTime.collectAsState()
     var isMapVisible by remember { mutableStateOf(false) }
+    var isBackpackVisible by remember { mutableStateOf(false) }
     
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     
+    var environment by remember { mutableStateOf<Environment?>(null) }
+    LaunchedEffect(environmentLoader) {
+        try {
+            environment = environmentLoader.loadHDREnvironment(
+                url = "https://sceneview.github.io/assets/environments/sky_2k.hdr"
+            )
+        } catch (e: Exception) {
+            // Handle error
+        }
+    }
+
     val sceneManager = remember(engine) { SceneManager(context, engine) }
     
     val playerModelInstance = remember { mutableStateOf<ModelInstance?>(null) }
@@ -112,13 +126,18 @@ fun GameScreen() {
 
     Box(modifier = Modifier.fillMaxSize()) {
         // 3D Scene
-        Scene(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            cameraNode = cameraNode,
-            childNodes = listOfNotNull(sceneManager.playerNode, sceneManager.groundNode, mainLightNode)
-        )
+        if (environment != null) {
+            Scene(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                cameraNode = cameraNode,
+                environment = environment!!,
+                childNodes = listOfNotNull(sceneManager.playerNode, sceneManager.groundNode, mainLightNode)
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+        }
 
         // Overlay UI
         Box(modifier = Modifier.fillMaxSize()) {
@@ -211,7 +230,7 @@ fun GameScreen() {
                     
                     ActionButton(
                         icon = Icons.Default.Backpack,
-                        onClick = { /* Open Backpack */ }
+                        onClick = { isBackpackVisible = true }
                     )
                 }
             }
@@ -223,9 +242,15 @@ fun GameScreen() {
                     onClose = { isMapVisible = false }
                 )
             }
+
+            if (isBackpackVisible) {
+                BackpackOverlay(
+                    onClose = { isBackpackVisible = false }
+                )
+            }
         }
 
-        if (isLoadingModel) {
+        if (isLoadingModel || environment == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
