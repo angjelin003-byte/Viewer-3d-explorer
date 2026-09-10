@@ -26,7 +26,8 @@ import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
-import io.github.sceneview.rememberNodes
+import io.github.sceneview.loaders.MaterialLoader
+import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.LightNode
@@ -74,40 +75,45 @@ fun GameScreen() {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
+    val materialLoader = rememberMaterialLoader(engine)
     
     var environment by remember { mutableStateOf<Environment?>(null) }
     val defaultEnvironment = remember(environmentLoader) { environmentLoader.createEnvironment() }
-    
+
+    val groundMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color(0xFF388E3C)) } // Green
+    val placeholderMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.Gray) }
+
     LaunchedEffect(environmentLoader) {
         try {
             environment = environmentLoader.loadHDREnvironment(
                 url = "https://sceneview.github.io/assets/environments/sky_2k.hdr"
             )
         } catch (e: Exception) {
-            // Fallback
         }
     }
 
-    val groundNode = remember(engine) {
+    val groundNode = remember(engine, groundMaterial) {
         CubeNode(
             engine = engine,
-            size = Size(2000f, 1f, 2000f)
+            size = Size(5000f, 1f, 5000f),
+            materialInstance = groundMaterial
         ).apply {
             position = Position(0f, -0.5f, 0f)
         }
     }
 
-    val playerPlaceholder = remember(engine) {
+    val playerPlaceholder = remember(engine, placeholderMaterial) {
         CubeNode(
             engine = engine,
-            size = Size(0.5f, 1.8f, 0.5f)
+            size = Size(0.5f, 1.8f, 0.5f),
+            materialInstance = placeholderMaterial
         ).apply {
             position = Position(0f, 0.9f, 0f)
         }
     }
 
     val sceneManager = remember(engine) { SceneManager(context, engine) }
-    val worldManager = remember(engine) { WorldManager(engine) }
+    val worldManager = remember(engine, materialLoader) { WorldManager(engine, materialLoader) }
     val weatherManager = remember(engine) { WeatherManager(engine) }
     
     val worldNodes = remember(worldManager) { worldManager.generateWorld() }
@@ -142,6 +148,7 @@ fun GameScreen() {
         val entity = EntityManager.get().create()
         LightManager.Builder(LightManager.Type.SUN)
             .intensity(80_000f)
+            .direction(0f, -1f, -0.5f) // Pointing down and slightly forward
             .castShadows(true)
             .build(engine, entity)
         LightNode(engine, entity)
@@ -180,15 +187,20 @@ fun GameScreen() {
         engine.lightManager.setIntensity(torchLightNode.entity, if (isTorchOn) 100_000f else 0f)
     }
 
-    // Explicitly define the list type to help the compiler
-    val allNodes = remember(groundNode, mainLightNode, worldNodes, sceneManager.playerNode, playerPlaceholder, torchLightNode) {
-        val list = mutableListOf<io.github.sceneview.node.Node>()
-        list.add(groundNode)
-        list.add(mainLightNode)
-        list.addAll(worldNodes)
-        sceneManager.playerNode?.let { list.add(it) } ?: list.add(playerPlaceholder)
-        list.add(torchLightNode)
-        list.toList()
+    // Optimized node management to prevent flickering
+    val allNodes = remember(groundNode, mainLightNode, worldNodes, torchLightNode) {
+        mutableListOf<io.github.sceneview.node.Node>().apply {
+            add(groundNode)
+            add(mainLightNode)
+            addAll(worldNodes)
+            add(torchLightNode)
+        }
+    }
+
+    val finalNodes = remember(allNodes, sceneManager.playerNode, playerPlaceholder) {
+        allNodes.toMutableList().apply {
+            add(sceneManager.playerNode ?: playerPlaceholder)
+        }
     }
 
     LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY, sceneManager.playerNode) {
@@ -222,10 +234,10 @@ fun GameScreen() {
             modelLoader = modelLoader,
             cameraNode = cameraNode,
             environment = environment ?: defaultEnvironment,
-            childNodes = allNodes
+            childNodes = finalNodes
         )
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

@@ -8,10 +8,18 @@ import io.github.sceneview.node.CubeNode
 import io.github.sceneview.node.Node
 import java.util.*
 
-class WorldManager(private val engine: Engine) {
+import io.github.sceneview.loaders.MaterialLoader
+import com.google.android.filament.MaterialInstance
+import androidx.compose.ui.graphics.Color
+
+class WorldManager(private val engine: Engine, private val materialLoader: MaterialLoader) {
 
     private val random = Random(42) // Deterministic seed for simple procedural generation
     
+    private val trunkMaterial = materialLoader.createColorInstance(Color(0xFF5D4037)) // Brown
+    private val leafMaterial = materialLoader.createColorInstance(Color(0xFF2E7D32)) // Green
+    private val rockMaterial = materialLoader.createColorInstance(Color(0xFF757575)) // Gray
+
     fun generateWorld(): List<Node> {
         val nodes = mutableListOf<Node>()
         
@@ -42,22 +50,21 @@ class WorldManager(private val engine: Engine) {
         // Trunk
         val trunk = CubeNode(
             engine = engine,
-            size = Size(0.4f, 2.0f, 0.4f)
+            size = Size(0.4f, 2.0f, 0.4f),
+            materialInstance = trunkMaterial
         ).apply {
             position = Position(x, 1.0f, z)
-            // Note: In a real app we'd set color/material here, 
-            // but CubeNode defaults to white. We'll stick to geometry for now.
         }
         
         // Leaves
         val leaves = CubeNode(
             engine = engine,
-            size = Size(2.0f, 2.0f, 2.0f)
+            size = Size(2.0f, 2.0f, 2.0f),
+            materialInstance = leafMaterial
         ).apply {
             position = Position(0f, 1.5f, 0f)
         }
         
-        // leaves.parent = trunk
         leaves.parent = trunk
         return trunk
     }
@@ -69,7 +76,8 @@ class WorldManager(private val engine: Engine) {
                 1.0f + random.nextFloat(),
                 0.5f + random.nextFloat(),
                 1.0f + random.nextFloat()
-            )
+            ),
+            materialInstance = rockMaterial
         ).apply {
             position = Position(x, 0.25f, z)
             rotation = Rotation(0f, random.nextFloat() * 360f, 0f)
