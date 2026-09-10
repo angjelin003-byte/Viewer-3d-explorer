@@ -71,6 +71,37 @@ fun Joystick(
 }
 
 @Composable
+fun EnvironmentHUD(
+    posX: Float,
+    posZ: Float,
+    weather: WeatherType,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .padding(16.dp)
+            .background(Color.Black.copy(alpha = 0.3f), shape = MaterialTheme.shapes.small)
+            .padding(8.dp)
+    ) {
+        Text(
+            text = "Loc: ${posX.toInt()}, ${posZ.toInt()}",
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall
+        )
+        Text(
+            text = "Biome: Wilderness",
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall
+        )
+        Text(
+            text = "Weather: ${weather.name}",
+            color = if (weather == WeatherType.CLEAR) Color.Yellow else Color.Cyan,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
 fun ActionButton(
     icon: ImageVector,
     onClick: () -> Unit,
@@ -120,17 +151,14 @@ fun CompassHUD(rotationY: Float, modifier: Modifier = Modifier) {
             val center = size / 2f
             val radius = size.minDimension / 2f * 0.8f
             
-            // Draw N, S, E, W
             val directions = listOf("N", "E", "S", "W")
             directions.forEachIndexed { index, label ->
                 val angle = Math.toRadians((index * 90 - rotationY - 90).toDouble()).toFloat()
                 val x = center.width + cos(angle) * radius
                 val y = center.height + sin(angle) * radius
-                // Simplified text drawing - just dots for now
                 drawCircle(Color.White, radius = 4f, center = Offset(x, y))
             }
             
-            // Needle
             val needleAngle = Math.toRadians((-rotationY - 90).toDouble()).toFloat()
             drawLine(
                 color = Color.Red,
@@ -197,7 +225,7 @@ fun StatusBarsHUD(
 }
 
 @Composable
-private fun StatusIndicator(label: String, value: Float, color: Color) {
+fun StatusIndicator(label: String, value: Float, color: Color) {
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -242,15 +270,13 @@ fun MapOverlay(
             Box(
                 modifier = Modifier
                     .size(300.dp)
-                    .background(Color(0xFF2D5A27)) // Dark green for island
+                    .background(Color(0xFF2D5A27))
             ) {
-                // Map visualization
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val mapSize = 1000f // 1km
+                    val mapSize = 1000f
                     val centerX = size.width / 2
                     val centerY = size.height / 2
                     
-                    // Player marker (normalized to map size)
                     val px = centerX + (playerPosX / mapSize) * size.width
                     val py = centerY + (playerPosZ / mapSize) * size.height
                     
@@ -297,7 +323,6 @@ fun BackpackOverlay(onClose: () -> Unit) {
                 
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
                 
-                // Simplified Inventory Grid
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
                     modifier = Modifier.weight(1f),

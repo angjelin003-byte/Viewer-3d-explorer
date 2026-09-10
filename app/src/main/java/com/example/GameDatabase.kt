@@ -19,6 +19,9 @@ data class SaveData(
     val hour: Int,
     val minute: Int,
     val stamina: Float,
+    val health: Float = 100f,
+    val hunger: Float = 100f,
+    val thirst: Float = 100f,
     val isTentDeployed: Boolean
 )
 

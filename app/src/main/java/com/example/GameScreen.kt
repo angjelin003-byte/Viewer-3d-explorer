@@ -106,6 +106,11 @@ fun GameScreen() {
     }
 
     val sceneManager = remember(engine) { SceneManager(context, engine) }
+    val worldManager = remember(engine) { WorldManager(engine) }
+    val weatherManager = remember(engine) { WeatherManager(engine) }
+    
+    val worldNodes = remember(worldManager) { worldManager.generateWorld() }
+    val weatherType by weatherManager.currentWeather.collectAsState()
     
     val playerModelInstance = remember { mutableStateOf<ModelInstance?>(null) }
     var isLoadingModel by remember { mutableStateOf(true) }
@@ -154,13 +159,21 @@ fun GameScreen() {
         val hours = gameTime / 60
         val isNight = hours < 5 || hours > 19
         
+        weatherManager.updateWeather(gameTime, environment)
+        
         val sunIntensity = when {
             hours in 6..18 -> 100_000f
             hours == 5 || hours == 19 -> 30_000f
             else -> 2_000f
         }
         engine.lightManager.setIntensity(mainLightNode.entity, sunIntensity)
-        environment?.indirectLight?.intensity = if (isNight) 100f else 30_000f
+        
+        // Environment indirect light intensity is now partially managed by WeatherManager 
+        // but we still want night reduction
+        if (isNight) {
+            environment?.indirectLight?.intensity = 100f
+        }
+        
         engine.lightManager.setIntensity(torchLightNode.entity, if (isTorchOn) 80_000f else 0f)
     }
 
@@ -179,6 +192,26 @@ fun GameScreen() {
         cameraNode.lookAt(Position(playerState.positionX, playerState.positionY + 0.8f, playerState.positionZ))
     }
 
+    val finalNodes = remember(sceneManager.playerNode, worldNodes, groundNode, mainLightNode, torchLightNode, playerState) {
+        val list = mutableListOf<io.github.sceneview.node.Node>()
+        list.add(groundNode)
+        list.add(mainLightNode)
+        list.addAll(worldNodes)
+        
+        val pNode = sceneManager.playerNode ?: playerPlaceholder.apply {
+            position = Position(playerState.positionX, playerState.positionY + 0.9f, playerState.positionZ)
+            rotation = Rotation(0f, playerState.rotationY, 0f)
+        }
+        list.add(pNode)
+        
+        list.add(torchLightNode.apply {
+            position = Position(playerState.positionX, playerState.positionY + 1.2f, playerState.positionZ)
+            rotation = Rotation(0f, viewModel.cameraRotationY, 0f)
+        })
+        
+        list
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scene(
             modifier = Modifier.fillMaxSize(),
@@ -186,18 +219,7 @@ fun GameScreen() {
             modelLoader = modelLoader,
             cameraNode = cameraNode,
             environment = environment ?: defaultEnvironment,
-            childNodes = listOfNotNull(
-                sceneManager.playerNode ?: playerPlaceholder.apply {
-                    position = Position(playerState.positionX, playerState.positionY + 0.9f, playerState.positionZ)
-                    rotation = sceneManager.playerNode?.rotation ?: Rotation()
-                }, 
-                groundNode, 
-                mainLightNode,
-                torchLightNode.apply {
-                    position = Position(playerState.positionX, playerState.positionY + 1.2f, playerState.positionZ)
-                    rotation = Rotation(0f, viewModel.cameraRotationY, 0f)
-                }
-            )
+            childNodes = finalNodes
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -218,6 +240,13 @@ fun GameScreen() {
                 hunger = hunger,
                 thirst = thirst,
                 stamina = stamina
+            )
+
+            EnvironmentHUD(
+                posX = playerState.positionX,
+                posZ = playerState.positionZ,
+                weather = weatherType,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp)
             )
 
             Column(

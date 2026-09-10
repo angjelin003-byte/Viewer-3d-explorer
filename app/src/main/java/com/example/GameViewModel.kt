@@ -74,6 +74,9 @@ class GameViewModel(private val saveDao: SaveDao? = null) : ViewModel() {
                     )
                     _gameTime.value = data.hour * 60 + data.minute
                     _stamina.value = data.stamina
+                    _health.value = data.health
+                    _hunger.value = data.hunger
+                    _thirst.value = data.thirst
                 }
             } catch (e: Exception) {
                 // Ignore load errors
@@ -98,6 +101,9 @@ class GameViewModel(private val saveDao: SaveDao? = null) : ViewModel() {
                         hour = hour,
                         minute = minute,
                         stamina = _stamina.value,
+                        health = _health.value,
+                        hunger = _hunger.value,
+                        thirst = _thirst.value,
                         isTentDeployed = p.isTentDeployed
                     )
                 )
