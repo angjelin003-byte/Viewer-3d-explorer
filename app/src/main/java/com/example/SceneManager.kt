@@ -15,22 +15,6 @@ class SceneManager(private val context: Context, private val engine: Engine) {
     var playerNode: ModelNode? = null
         private set
 
-    var groundNode: CubeNode? = null
-        private set
-
-    init {
-        try {
-            groundNode = CubeNode(
-                engine = engine,
-                size = Size(100f, 0.1f, 100f)
-            ).apply {
-                position = Position(0f, -0.05f, 0f)
-            }
-        } catch (e: Exception) {
-            // Log or handle error
-        }
-    }
-    
     fun setPlayerModel(modelInstance: io.github.sceneview.model.ModelInstance) {
         try {
             playerNode = ModelNode(

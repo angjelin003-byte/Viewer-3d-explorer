@@ -28,9 +28,13 @@ import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberNodes
 import io.github.sceneview.math.Position
-import io.github.sceneview.rememberMainLightNode
-
+import io.github.sceneview.math.Rotation
+import io.github.sceneview.node.LightNode
+import io.github.sceneview.node.CubeNode
+import io.github.sceneview.math.Size
 import io.github.sceneview.model.ModelInstance
+import com.google.android.filament.LightManager
+import com.google.android.filament.EntityManager
 
 @Composable
 fun GameScreen() {
@@ -57,6 +61,12 @@ fun GameScreen() {
 
     val playerState by viewModel.playerState.collectAsState()
     val gameTime by viewModel.gameTime.collectAsState()
+    val isTorchOn by viewModel.isTorchOn.collectAsState()
+    val health by viewModel.health.collectAsState()
+    val hunger by viewModel.hunger.collectAsState()
+    val thirst by viewModel.thirst.collectAsState()
+    val stamina by viewModel.stamina.collectAsState()
+    
     var isMapVisible by remember { mutableStateOf(false) }
     var isBackpackVisible by remember { mutableStateOf(false) }
     
@@ -65,13 +75,33 @@ fun GameScreen() {
     val environmentLoader = rememberEnvironmentLoader(engine)
     
     var environment by remember { mutableStateOf<Environment?>(null) }
+    val defaultEnvironment = remember(environmentLoader) { environmentLoader.createEnvironment() }
+    
     LaunchedEffect(environmentLoader) {
         try {
             environment = environmentLoader.loadHDREnvironment(
                 url = "https://sceneview.github.io/assets/environments/sky_2k.hdr"
             )
         } catch (e: Exception) {
-            // Handle error
+            // Fallback
+        }
+    }
+
+    val groundNode = remember(engine) {
+        CubeNode(
+            engine = engine,
+            size = Size(1000f, 1f, 1000f)
+        ).apply {
+            position = Position(0f, -0.5f, 0f)
+        }
+    }
+
+    val playerPlaceholder = remember(engine) {
+        CubeNode(
+            engine = engine,
+            size = Size(0.5f, 1.8f, 0.5f)
+        ).apply {
+            position = Position(0f, 0.9f, 0f)
         }
     }
 
@@ -80,14 +110,13 @@ fun GameScreen() {
     val playerModelInstance = remember { mutableStateOf<ModelInstance?>(null) }
     var isLoadingModel by remember { mutableStateOf(true) }
 
-    // Update scene manager when model is loaded
     LaunchedEffect(modelLoader) {
+        isLoadingModel = true
         try {
-            playerModelInstance.value = modelLoader.createModelInstance(
-                assetFileLocation = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
+            playerModelInstance.value = modelLoader.loadModelInstance(
+                fileLocation = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
             )
         } catch (e: Exception) {
-            // Handle loading error
         } finally {
             isLoadingModel = false
         }
@@ -103,45 +132,75 @@ fun GameScreen() {
         position = Position(0f, 1.5f, 4f)
     }
 
-    val mainLightNode = rememberMainLightNode(engine) {
-        intensity = 100_000f
+    val mainLightNode = remember(engine) {
+        val entity = EntityManager.get().create()
+        LightManager.Builder(LightManager.Type.SUN)
+            .intensity(100_000f)
+            .build(engine, entity)
+        LightNode(engine, entity)
+    }
+
+    val torchLightNode = remember(engine) {
+        val entity = EntityManager.get().create()
+        LightManager.Builder(LightManager.Type.SPOT)
+            .intensity(0f)
+            .spotLightCone(Math.toRadians(15.0).toFloat(), Math.toRadians(30.0).toFloat())
+            .falloff(20f)
+            .build(engine, entity)
+        LightNode(engine, entity)
+    }
+
+    LaunchedEffect(gameTime, isTorchOn, environment) {
+        val hours = gameTime / 60
+        val isNight = hours < 5 || hours > 19
+        
+        val sunIntensity = when {
+            hours in 6..18 -> 100_000f
+            hours == 5 || hours == 19 -> 30_000f
+            else -> 2_000f
+        }
+        engine.lightManager.setIntensity(mainLightNode.entity, sunIntensity)
+        environment?.indirectLight?.intensity = if (isNight) 100f else 30_000f
+        engine.lightManager.setIntensity(torchLightNode.entity, if (isTorchOn) 80_000f else 0f)
     }
 
     LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY, sceneManager.playerNode) {
-        val node = sceneManager.playerNode ?: return@LaunchedEffect
         sceneManager.updatePlayer(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY)
         
-        // Update camera position to follow player (Third Person)
-        val cameraDistance = 4f
+        val cameraDistance = 6f
         val radY = Math.toRadians(viewModel.cameraRotationY.toDouble()).toFloat()
         val radX = Math.toRadians(viewModel.cameraRotationX.toDouble()).toFloat()
         
         val camX = playerState.positionX + sin(radY) * cos(radX) * cameraDistance
-        val camY = playerState.positionY - sin(radX) * cameraDistance + 1.5f // Height offset
+        val camY = playerState.positionY - sin(radX) * cameraDistance + 2.0f
         val camZ = playerState.positionZ + cos(radY) * cos(radX) * cameraDistance
         
         cameraNode.position = Position(camX, camY, camZ)
-        cameraNode.lookAt(node.position)
+        cameraNode.lookAt(Position(playerState.positionX, playerState.positionY + 0.8f, playerState.positionZ))
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 3D Scene
-        if (environment != null) {
-            Scene(
-                modifier = Modifier.fillMaxSize(),
-                engine = engine,
-                modelLoader = modelLoader,
-                cameraNode = cameraNode,
-                environment = environment!!,
-                childNodes = listOfNotNull(sceneManager.playerNode, sceneManager.groundNode, mainLightNode)
+        Scene(
+            modifier = Modifier.fillMaxSize(),
+            engine = engine,
+            modelLoader = modelLoader,
+            cameraNode = cameraNode,
+            environment = environment ?: defaultEnvironment,
+            childNodes = listOfNotNull(
+                sceneManager.playerNode ?: playerPlaceholder.apply {
+                    position = Position(playerState.positionX, playerState.positionY + 0.9f, playerState.positionZ)
+                    rotation = sceneManager.playerNode?.rotation ?: Rotation()
+                }, 
+                groundNode, 
+                mainLightNode,
+                torchLightNode.apply {
+                    position = Position(playerState.positionX, playerState.positionY + 1.2f, playerState.positionZ)
+                    rotation = Rotation(0f, viewModel.cameraRotationY, 0f)
+                }
             )
-        } else {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-        }
+        )
 
-        // Overlay UI
         Box(modifier = Modifier.fillMaxSize()) {
-            // Interaction Area for Camera Control (Background of UI)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -154,39 +213,31 @@ fun GameScreen() {
                     }
             )
 
-            // Top HUD
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 48.dp, start = 16.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            StatusBarsHUD(
+                health = health,
+                hunger = hunger,
+                thirst = thirst,
+                stamina = stamina
+            )
+
+            Column(
+                modifier = Modifier.align(Alignment.TopEnd),
+                horizontalAlignment = Alignment.End
             ) {
-                Compass(rotationY = playerState.rotationY)
-                
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = String.format("%02d:00", gameTime.hour),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.White
-                    )
-                    StaminaBar(stamina = playerState.stamina)
-                }
+                CompassHUD(rotationY = viewModel.cameraRotationY)
+                TimeHUD(gameTime = gameTime)
             }
 
-            // Controls
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = 48.dp, start = 16.dp, end = 16.dp)
             ) {
-                // Left Joystick
                 Joystick(
                     modifier = Modifier.align(Alignment.BottomStart),
                     onMove = { x, z ->
                         if (x != 0f || z != 0f) {
-                            viewModel.setMovementState(if (playerState.stamina > 20) MovementState.WALKING else MovementState.WALKING) // Logic handled in VM
-                            // In a real implementation, rotation would be derived from movement or camera
+                            viewModel.setMovementState(MovementState.WALKING)
                             viewModel.updatePosition(x, z, viewModel.cameraRotationY)
                         } else {
                             viewModel.setMovementState(MovementState.IDLE)
@@ -194,15 +245,14 @@ fun GameScreen() {
                     }
                 )
 
-                // Right Action Buttons
                 Column(
                     modifier = Modifier.align(Alignment.BottomEnd),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     ActionButton(
-                        icon = if (playerState.isTorchOn) Icons.Default.Lightbulb else Icons.Default.LightbulbCircle,
+                        icon = if (isTorchOn) Icons.Default.FlashlightOff else Icons.Default.FlashlightOn,
                         onClick = { viewModel.toggleTorch() },
-                        active = playerState.isTorchOn
+                        active = isTorchOn
                     )
                     
                     ActionButton(
@@ -250,26 +300,29 @@ fun GameScreen() {
             }
         }
 
-        if (isLoadingModel || environment == null) {
+        if (isLoadingModel && playerModelInstance.value == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f)),
+                    .background(Color.Black.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Loading Wilderness...", color = Color.White)
+                    Text(
+                        text = "Loading Wilderness...",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
                 }
             }
         }
     }
     
-    // Auto-save or periodic updates
     LaunchedEffect(Unit) {
         while (true) {
-            delay(10000) // Save every 10 seconds
+            delay(10000)
             viewModel.saveGame()
         }
     }

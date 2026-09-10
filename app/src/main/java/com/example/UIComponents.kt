@@ -108,7 +108,7 @@ fun StaminaBar(stamina: Float, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun Compass(rotationY: Float, modifier: Modifier = Modifier) {
+fun CompassHUD(rotationY: Float, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(80.dp)
@@ -143,6 +143,78 @@ fun Compass(rotationY: Float, modifier: Modifier = Modifier) {
             )
         }
         Text("N", color = Color.Red, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+fun TimeHUD(gameTime: Int) {
+    val totalMinutes = gameTime
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    
+    val dayProgress = gameTime.toFloat() / 1440f
+
+    Column(
+        modifier = Modifier.padding(16.dp),
+        horizontalAlignment = Alignment.End
+    ) {
+        Text(
+            text = "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}",
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = dayProgress,
+            modifier = Modifier
+                .width(120.dp)
+                .height(4.dp)
+                .clip(CircleShape),
+            color = if (hours in 6..18) Color(0xFFFFD700) else Color(0xFF4B0082),
+            trackColor = Color.White.copy(alpha = 0.3f)
+        )
+    }
+}
+
+@Composable
+fun StatusBarsHUD(
+    health: Float,
+    hunger: Float,
+    thirst: Float,
+    stamina: Float
+) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .width(150.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        StatusIndicator(label = "Health", value = health / 100f, color = Color.Red)
+        StatusIndicator(label = "Hunger", value = hunger / 100f, color = Color(0xFFFFA500))
+        StatusIndicator(label = "Thirst", value = thirst / 100f, color = Color.Cyan)
+        StatusIndicator(label = "Energy", value = stamina / 100f, color = Color.Green)
+    }
+}
+
+@Composable
+private fun StatusIndicator(label: String, value: Float, color: Color) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Text("${(value * 100).toInt()}%", color = Color.White, style = MaterialTheme.typography.labelSmall)
+        }
+        LinearProgressIndicator(
+            progress = value,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(CircleShape),
+            color = color,
+            trackColor = Color.Black.copy(alpha = 0.5f)
+        )
     }
 }
 
