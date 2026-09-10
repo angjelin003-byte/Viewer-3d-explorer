@@ -140,7 +140,8 @@ fun GameScreen() {
     val mainLightNode = remember(engine) {
         val entity = EntityManager.get().create()
         LightManager.Builder(LightManager.Type.SUN)
-            .intensity(100_000f)
+            .intensity(50_000f) // Lowered from 100k to prevent washout
+            .castShadows(true)
             .build(engine, entity)
         LightNode(engine, entity)
     }
@@ -149,8 +150,9 @@ fun GameScreen() {
         val entity = EntityManager.get().create()
         LightManager.Builder(LightManager.Type.SPOT)
             .intensity(0f)
-            .spotLightCone(Math.toRadians(15.0).toFloat(), Math.toRadians(30.0).toFloat())
-            .falloff(20f)
+            .spotLightCone(Math.toRadians(20.0).toFloat(), Math.toRadians(40.0).toFloat())
+            .falloff(15f)
+            .color(1.0f, 0.9f, 0.7f) // Warm light
             .build(engine, entity)
         LightNode(engine, entity)
     }
@@ -162,24 +164,53 @@ fun GameScreen() {
         weatherManager.updateWeather(gameTime, environment)
         
         val sunIntensity = when {
-            hours in 6..18 -> 100_000f
-            hours == 5 || hours == 19 -> 30_000f
-            else -> 2_000f
+            hours in 6..18 -> 50_000f
+            hours == 5 || hours == 19 -> 15_000f
+            else -> 500f
         }
         engine.lightManager.setIntensity(mainLightNode.entity, sunIntensity)
         
-        // Environment indirect light intensity is now partially managed by WeatherManager 
-        // but we still want night reduction
         if (isNight) {
             environment?.indirectLight?.intensity = 100f
+        } else {
+            environment?.indirectLight?.intensity = 20_000f
         }
         
-        engine.lightManager.setIntensity(torchLightNode.entity, if (isTorchOn) 80_000f else 0f)
+        engine.lightManager.setIntensity(torchLightNode.entity, if (isTorchOn) 60_000f else 0f)
     }
 
-    LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY, sceneManager.playerNode) {
+    // We keep the nodes list stable to prevent flickering.
+    val staticNodes = remember(groundNode, mainLightNode, worldNodes) {
+        val list = mutableListOf<io.github.sceneview.node.Node>()
+        list.add(groundNode)
+        list.add(mainLightNode)
+        list.addAll(worldNodes)
+        list
+    }
+
+    // Use a derived state or a managed list for dynamic nodes to avoid rebuilding everything.
+    val allNodes = remember(staticNodes, sceneManager.playerNode, playerPlaceholder, torchLightNode) {
+        val list = mutableListOf<io.github.sceneview.node.Node>()
+        list.addAll(staticNodes)
+        list.add(sceneManager.playerNode ?: playerPlaceholder)
+        list.add(torchLightNode)
+        list
+    }
+
+    LaunchedEffect(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY) {
         sceneManager.updatePlayer(playerState, viewModel.cameraRotationX, viewModel.cameraRotationY)
         
+        // Update placeholder if active
+        if (sceneManager.playerNode == null) {
+            playerPlaceholder.position = Position(playerState.positionX, playerState.positionY + 0.9f, playerState.positionZ)
+            playerPlaceholder.rotation = Rotation(0f, playerState.rotationY, 0f)
+        }
+
+        // Update torch position
+        torchLightNode.position = Position(playerState.positionX, playerState.positionY + 1.2f, playerState.positionZ)
+        torchLightNode.rotation = Rotation(0f, viewModel.cameraRotationY, 0f)
+
+        // Camera follow logic
         val cameraDistance = 6f
         val radY = Math.toRadians(viewModel.cameraRotationY.toDouble()).toFloat()
         val radX = Math.toRadians(viewModel.cameraRotationX.toDouble()).toFloat()
@@ -192,26 +223,6 @@ fun GameScreen() {
         cameraNode.lookAt(Position(playerState.positionX, playerState.positionY + 0.8f, playerState.positionZ))
     }
 
-    val finalNodes = remember(sceneManager.playerNode, worldNodes, groundNode, mainLightNode, torchLightNode, playerState) {
-        val list = mutableListOf<io.github.sceneview.node.Node>()
-        list.add(groundNode)
-        list.add(mainLightNode)
-        list.addAll(worldNodes)
-        
-        val pNode = sceneManager.playerNode ?: playerPlaceholder.apply {
-            position = Position(playerState.positionX, playerState.positionY + 0.9f, playerState.positionZ)
-            rotation = Rotation(0f, playerState.rotationY, 0f)
-        }
-        list.add(pNode)
-        
-        list.add(torchLightNode.apply {
-            position = Position(playerState.positionX, playerState.positionY + 1.2f, playerState.positionZ)
-            rotation = Rotation(0f, viewModel.cameraRotationY, 0f)
-        })
-        
-        list
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Scene(
             modifier = Modifier.fillMaxSize(),
@@ -219,7 +230,7 @@ fun GameScreen() {
             modelLoader = modelLoader,
             cameraNode = cameraNode,
             environment = environment ?: defaultEnvironment,
-            childNodes = finalNodes
+            childNodes = allNodes
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -265,12 +276,7 @@ fun GameScreen() {
                 Joystick(
                     modifier = Modifier.align(Alignment.BottomStart),
                     onMove = { x, z ->
-                        if (x != 0f || z != 0f) {
-                            viewModel.setMovementState(MovementState.WALKING)
-                            viewModel.updatePosition(x, z, viewModel.cameraRotationY)
-                        } else {
-                            viewModel.setMovementState(MovementState.IDLE)
-                        }
+                        viewModel.updateJoystickInput(x, z)
                     }
                 )
 

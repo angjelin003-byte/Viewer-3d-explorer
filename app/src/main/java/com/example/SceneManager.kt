@@ -9,11 +9,16 @@ import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.node.CubeNode
 import io.github.sceneview.math.Size
 import com.google.android.filament.Engine
+import kotlin.math.sin
+import kotlin.math.cos
 
 class SceneManager(private val context: Context, private val engine: Engine) {
     
     var playerNode: ModelNode? = null
         private set
+
+    private var currentAnimationIndex = -1
+    private var animationStartTime = 0L
 
     fun setPlayerModel(modelInstance: io.github.sceneview.model.ModelInstance) {
         try {
@@ -32,20 +37,22 @@ class SceneManager(private val context: Context, private val engine: Engine) {
         try {
             val node = playerNode ?: return
             
-            // Animation: simple bobbing when walking/running
-            val time = System.currentTimeMillis() / 1000f
-            val bob = if (state.movementState != MovementState.IDLE) {
-                val freq = if (state.movementState == MovementState.RUNNING) 10f else 5f
-                kotlin.math.sin(time * freq) * 0.05f
-            } else 0f
-            
-            node.position = Position(state.positionX, state.positionY + bob, state.positionZ)
+            node.position = Position(state.positionX, state.positionY, state.positionZ)
             node.rotation = Rotation(0f, state.rotationY, 0f)
+
+            // Animation logic
+            val animationIndex = when (state.movementState) {
+                MovementState.IDLE -> 0 // Survey
+                MovementState.WALKING -> 1 // Walk
+                MovementState.RUNNING -> 2 // Run
+            }
+
+            if (currentAnimationIndex != animationIndex) {
+                currentAnimationIndex = animationIndex
+                node.playAnimation(animationIndex, loop = true)
+            }
         } catch (e: Exception) {
             // Ignore rendering errors
         }
     }
-    
-    private fun sin(rad: Float) = kotlin.math.sin(rad.toDouble()).toFloat()
-    private fun cos(rad: Float) = kotlin.math.cos(rad.toDouble()).toFloat()
 }

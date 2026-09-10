@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalTime
+import kotlin.math.*
 
 enum class MovementState {
     IDLE, WALKING, RUNNING
@@ -113,28 +114,40 @@ class GameViewModel(private val saveDao: SaveDao? = null) : ViewModel() {
         }
     }
 
-    fun updatePosition(dx: Float, dz: Float, rotation: Float) {
+    fun updatePosition(dx: Float, dz: Float, cameraRotationY: Float) {
         val currentState = _playerState.value
         if (currentState.stamina <= 0 && currentState.movementState == MovementState.RUNNING) {
             // Force walk if out of stamina
-            return
+            setMovementState(MovementState.WALKING)
         }
 
         val speed = when (currentState.movementState) {
             MovementState.RUNNING -> 0.15f
-            MovementState.WALKING -> 0.05f
+            MovementState.WALKING -> 0.06f
             else -> 0f
         }
 
-        // Apply rotation to movement
-        val rad = Math.toRadians(rotation.toDouble()).toFloat()
-        val moveX = (dx * Math.cos(rad.toDouble()) - dz * Math.sin(rad.toDouble())).toFloat() * speed
-        val moveZ = (dx * Math.sin(rad.toDouble()) + dz * Math.cos(rad.toDouble())).toFloat() * speed
+        if (dx == 0f && dz == 0f) {
+            setMovementState(MovementState.IDLE)
+            return
+        }
+
+        // The joystick dx/dz are already normalized and relative to the screen.
+        // We need to rotate them by cameraRotationY to get world movement.
+        val angleRad = Math.toRadians(cameraRotationY.toDouble()).toFloat()
+        
+        // Joystick Z is forward/backward, X is left/right
+        // In world space (Filament): +X is right, -Z is forward
+        val worldDX = dx * cos(angleRad) + dz * sin(angleRad)
+        val worldDZ = -dx * sin(angleRad) + dz * cos(angleRad)
+
+        // Calculate rotation for the character to face movement direction
+        val moveAngle = Math.toDegrees(atan2(worldDX.toDouble(), worldDZ.toDouble())).toFloat()
 
         _playerState.value = currentState.copy(
-            positionX = currentState.positionX + moveX,
-            positionZ = currentState.positionZ + moveZ,
-            rotationY = rotation
+            positionX = currentState.positionX + worldDX * speed,
+            positionZ = currentState.positionZ + worldDZ * speed,
+            rotationY = moveAngle
         )
 
         updateStamina(currentState.movementState)
@@ -171,28 +184,58 @@ class GameViewModel(private val saveDao: SaveDao? = null) : ViewModel() {
         _gameTime.value = (_gameTime.value + minutes) % 1440
     }
 
+    var joystickX by mutableStateOf(0f)
+    var joystickZ by mutableStateOf(0f)
+
+    fun updateJoystickInput(x: Float, z: Float) {
+        joystickX = x
+        joystickZ = z
+        if (x == 0f && z == 0f) {
+            setMovementState(MovementState.IDLE)
+        } else if (_playerState.value.movementState == MovementState.IDLE) {
+            setMovementState(MovementState.WALKING)
+        }
+    }
+
     private fun updateGameSystems() {
         viewModelScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(16) // ~60fps
                 
-                // Update Time
-                _gameTime.value = (_gameTime.value + 1) % 1440
-                
-                // Hunger and Thirst decay
-                _hunger.value = (_hunger.value - 0.05f).coerceIn(0f, 100f)
-                _thirst.value = (_thirst.value - 0.08f).coerceIn(0f, 100f)
-                
-                // Health decay if starving or dehydrated
-                if (_hunger.value <= 0f || _thirst.value <= 0f) {
-                    _health.value = (_health.value - 0.5f).coerceIn(0f, 100f)
+                // Continuous movement if joystick is active
+                if (joystickX != 0f || joystickZ != 0f) {
+                    updatePosition(joystickX, joystickZ, cameraRotationY)
                 }
-                
-                // Stamina regeneration if not moving
-                if (_playerState.value.movementState == MovementState.IDLE && _stamina.value < 100f) {
-                    _stamina.value = (_stamina.value + 0.2f).coerceIn(0f, 100f)
-                }
+
+                // Every 1000ms (roughly 60 ticks)
+                // We'll just use a counter to slow down the other systems
+                // But for simplicity, let's just use another loop or check time
             }
+        }
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                advanceSystems()
+            }
+        }
+    }
+
+    private fun advanceSystems() {
+        // Update Time
+        _gameTime.value = (_gameTime.value + 1) % 1440
+        
+        // Hunger and Thirst decay
+        _hunger.value = (_hunger.value - 0.05f).coerceIn(0f, 100f)
+        _thirst.value = (_thirst.value - 0.08f).coerceIn(0f, 100f)
+        
+        // Health decay if starving or dehydrated
+        if (_hunger.value <= 0f || _thirst.value <= 0f) {
+            _health.value = (_health.value - 0.5f).coerceIn(0f, 100f)
+        }
+        
+        // Stamina regeneration if not moving
+        if (_playerState.value.movementState == MovementState.IDLE && _stamina.value < 100f) {
+            _stamina.value = (_stamina.value + 0.2f).coerceIn(0f, 100f)
         }
     }
 }

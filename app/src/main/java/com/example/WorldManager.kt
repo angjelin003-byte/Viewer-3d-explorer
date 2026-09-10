@@ -15,23 +15,22 @@ class WorldManager(private val engine: Engine) {
     fun generateWorld(): List<Node> {
         val nodes = mutableListOf<Node>()
         
-        // Add some "Trees" (brown trunks and green tops)
-        for (i in 0 until 50) {
-            val x = random.nextFloat() * 200f - 100f
-            val z = random.nextFloat() * 200f - 100f
+        // Add more "Trees" and vary them
+        for (i in 0 until 100) {
+            val x = random.nextFloat() * 400f - 200f
+            val z = random.nextFloat() * 400f - 200f
             
-            // Skip spawning near origin (player start)
-            if (kotlin.math.abs(x) < 5f && kotlin.math.abs(z) < 5f) continue
+            if (kotlin.math.abs(x) < 8f && kotlin.math.abs(z) < 8f) continue
             
             nodes.add(createTree(x, z))
         }
         
-        // Add some "Rocks" (gray cubes)
-        for (i in 0 until 30) {
-            val x = random.nextFloat() * 180f - 90f
-            val z = random.nextFloat() * 180f - 90f
+        // Add more "Rocks"
+        for (i in 0 until 60) {
+            val x = random.nextFloat() * 350f - 175f
+            val z = random.nextFloat() * 350f - 175f
             
-            if (kotlin.math.abs(x) < 5f && kotlin.math.abs(z) < 5f) continue
+            if (kotlin.math.abs(x) < 8f && kotlin.math.abs(z) < 8f) continue
             
             nodes.add(createRock(x, z))
         }
